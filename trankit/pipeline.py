@@ -1,3 +1,6 @@
+# Modified by Guillaume Loignon, 2026: device selection (cpu/cuda/mps) and related changes.
+# Derived from Trankit (https://github.com/nlp-uoregon/trankit), Apache License 2.0.
+
 from .config import Config as MasterConfig
 from .models.base_models import Multilingual_Embedding
 from .models.classifiers import TokenizerClassifier, PosDepClassifier, NERClassifier

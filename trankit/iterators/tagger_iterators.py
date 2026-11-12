@@ -1,3 +1,6 @@
+# Modified by Guillaume Loignon, 2026: device selection (cpu/cuda/mps) and related changes.
+# Derived from Trankit (https://github.com/nlp-uoregon/trankit), Apache License 2.0.
+
 from . import *
 from ..device import transformer_attention_mask_dtype
 

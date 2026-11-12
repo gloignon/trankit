@@ -1,3 +1,6 @@
+# Modified by Guillaume Loignon, 2026: device selection (cpu/cuda/mps) and related changes.
+# Derived from Trankit (https://github.com/nlp-uoregon/trankit), Apache License 2.0.
+
 import unittest
 from types import SimpleNamespace
 

@@ -1,3 +1,6 @@
+# Modified by Guillaume Loignon, 2026: device selection (cpu/cuda/mps) and related changes.
+# Derived from Trankit (https://github.com/nlp-uoregon/trankit), Apache License 2.0.
+
 """Device selection helpers shared by the inference and training pipelines."""
 
 import torch
