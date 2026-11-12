@@ -1,3 +1,6 @@
+# Modified by Guillaume Loignon, 2026: device selection (cpu/cuda/mps) and related changes.
+# Derived from Trankit (https://github.com/nlp-uoregon/trankit), Apache License 2.0.
+
 from .config import Config as MasterConfig
 from .models.base_models import Multilingual_Embedding
 from .models.classifiers import TokenizerClassifier, PosDepClassifier, NERClassifier
@@ -12,9 +15,10 @@ from collections import defaultdict
 from .utils.conll import *
 from .utils.tbinfo import tbname2training_id, lang2treebank
 from .utils.chuliu_edmonds import *
+from .device import resolve_device
 from tqdm import tqdm
-from transformers import AdamW, get_linear_schedule_with_warmup
-from transformers import XLMRobertaTokenizer
+from transformers import get_linear_schedule_with_warmup
+from .encoder import set_embedding, load_tokenizer
 import logging
 
 
@@ -81,7 +85,10 @@ class TPipeline:
                     'lr': self._config.learning_rate, 'weight_decay': self._config.weight_decay
                 }
             ]
-            self.optimizer = AdamW(params=param_groups)
+            # torch.optim.AdamW instead of the deprecated transformers.AdamW: on MPS the latter's in-place
+            # updates clear requires_grad on every parameter after the first step. eps=1e-6 keeps
+            # transformers' default; bias correction and decoupled weight decay are equivalent.
+            self.optimizer = torch.optim.AdamW(params=param_groups, lr=1e-3, eps=1e-6)
 
             self.schedule = get_linear_schedule_with_warmup(self.optimizer,
                                                             num_warmup_steps=self.batch_num * 5,
@@ -108,23 +115,23 @@ class TPipeline:
 
     def _set_up_config(self, training_config):
         print('Setting up training config...')
+        legacy_gpu = training_config['gpu'] if 'gpu' in training_config else True
+        requested_device = training_config['device'] if 'device' in training_config else None
+        selected_device = resolve_device(requested_device, gpu=legacy_gpu)
         # set random seed
         os.environ['PYTHONHASHSEED'] = str(1234)
         random.seed(1234)
         np.random.seed(1234)
         torch.manual_seed(1234)
-        torch.cuda.manual_seed(1234)
-        torch.cuda.manual_seed_all(1234)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-        # empty cache
-        torch.cuda.empty_cache()
+        if selected_device.type == 'cuda':
+            torch.cuda.manual_seed(1234)
+            torch.cuda.manual_seed_all(1234)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
 
         # set embedding name
         self.master_config = MasterConfig()
-        self.master_config.embedding_name = 'xlm-roberta-base' if 'embedding' not in training_config else training_config['embedding']
-        assert self.master_config.embedding_name in supported_embeddings, '{} has not been supported.\nSupported embeddings: {}'.format(
-            self.master_config.embedding_name, supported_embeddings)
+        set_embedding(self.master_config, training_config.get('embedding', 'xlm-roberta-base'))
 
         # lang and data
         self._lang = training_config['category'] if 'category' in training_config else 'customized'
@@ -163,15 +170,11 @@ class TPipeline:
         self._save_dir = training_config['save_dir'] if 'save_dir' in training_config else './cache/'
         self._save_dir = os.path.join(self._save_dir, self.master_config.embedding_name, self._lang)
         self._cache_dir = self._save_dir
-        self._gpu = training_config['gpu'] if 'gpu' in training_config else True
-        self._use_gpu = training_config['gpu'] if 'gpu' in training_config else True
+        self._gpu = legacy_gpu
+        # Legacy MWT/lemma code uses .cuda() directly; keep it CPU-bound on MPS.
+        self._use_gpu = selected_device.type == 'cuda'
         self._ud_eval = True
-        if self._gpu and torch.cuda.is_available():
-            self._use_gpu = True
-            self.master_config.device = torch.device('cuda')
-        else:
-            self._use_gpu = False
-            self.master_config.device = torch.device('cpu')
+        self.master_config.device = selected_device
 
         self.master_config._save_dir = self._save_dir
         self.master_config._cache_dir = self._save_dir
@@ -211,8 +214,7 @@ class TPipeline:
 
         # wordpiece splitter
         if self._task not in ['mwt', 'lemmatize']:
-            self.master_config.wordpiece_splitter = XLMRobertaTokenizer.from_pretrained(self.master_config.embedding_name,
-                                                                                   cache_dir=self.master_config._save_dir)
+            self.master_config.wordpiece_splitter = load_tokenizer(self.master_config, cache_dir=self.master_config._save_dir)
 
     def _prepare_tokenize(self):
         self.train_set = TokenizeDataset(

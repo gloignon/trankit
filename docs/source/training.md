@@ -10,6 +10,8 @@ Building customized pipelines are easy with Trankit. The training is done via th
 
 The category names are used as the special identities in the `Pipeline` class. Thus, we need to choose one of the categories to start training our customized pipelines. Below we show the example for training and loading a `customized-mwt-ner` pipeline. Training procedure for customized pipelines of other categories can be obtained by obmitting the steps related to the models that those pipelines don't have. For data format, `Tpipeline` accepts training data in [CONLL-U format](https://github.com/UniversalDependencies/UD_English-EWT) for the Universal Dependencies tasks, and training data in [BIO format](https://www.clips.uantwerpen.be/conll2003/ner/) for the NER task.
 
+Set `device` in `training_config` to `'cpu'`, `'cuda'`, or `'mps'` to select the training device. If omitted, the legacy `gpu` setting determines whether CUDA is used when available.
+
 ## Training
 ### Training a joint token and sentence splitter
 ```python

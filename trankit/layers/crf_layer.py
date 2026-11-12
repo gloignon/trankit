@@ -1,3 +1,6 @@
+# Modified by Guillaume Loignon, 2026: device selection (cpu/cuda/mps) and related changes.
+# Derived from Trankit (https://github.com/nlp-uoregon/trankit), Apache License 2.0.
+
 '''
 Borrowed from https://github.com/stanfordnlp/stanza/blob/master/stanza/models/common/crf.py
 Date: 2021/01/06
@@ -50,7 +53,7 @@ class CRFLoss(nn.Module):
         """
         flat_inputs = inputs.view(self.bs, -1)
         flat_tag_indices = tag_indices + \
-                           set_cuda(torch.arange(self.sl).long().unsqueeze(0) * self.nc, tag_indices.is_cuda)
+                           torch.arange(self.sl, device=tag_indices.device).long().unsqueeze(0) * self.nc
         unary_scores = torch.gather(flat_inputs, 1, flat_tag_indices).view(self.bs, -1)
         unary_scores.masked_fill_(masks, 0)
         return unary_scores.sum(dim=1)
@@ -92,7 +95,7 @@ class CRFLoss(nn.Module):
             new_alphas = rest_inputs[:, i, :] + log_sum_exp(transition_scores, dim=1)
             m = rest_masks[:, i].unsqueeze(1).expand_as(new_alphas)  # bs x nc, 1 for padding idx
             # apply masks
-            new_alphas.masked_scatter_(m, alphas.masked_select(m))
+            new_alphas = torch.where(m, alphas, new_alphas)  # MPS has no masked_scatter_; equivalent
             alphas = new_alphas
         log_norm = log_sum_exp(alphas, dim=1)
         return log_norm
@@ -144,7 +147,3 @@ def log_sum_exp(value, dim=None, keepdim=False):
             return m + torch.log(sum_exp)
 
 
-def set_cuda(var, cuda):
-    if cuda:
-        return var.cuda()
-    return var
