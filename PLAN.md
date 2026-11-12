@@ -119,3 +119,16 @@ Next: evaluate (gold-tok UPOS/LEMMA/UAS/LAS on `data/filtered` test; sentence-bo
 
 ### Evaluation protocol (decided 2026-11-12)
 ALSI's `eval_trankit.py --end-to-end` ("Sent 100" in the ALSI README) feeds one sentence per input and counts inputs with exactly 1 sentence returned, so it cannot detect under-splitting. For the new model, report CoNLL-18 `ud_eval` Sentences/Tokens/Words/UPOS/Lemma/UAS/LAS F1 on RAW multi-sentence paragraphs from `data/filtered/fr_gsd-ud-test.conllu`, for: new CamemBERT model (own splitting), old XLM-R model (own splitting), old model + syntok. Targets (README, same test set family): Sent 93.6 (UDPipe 1) .. 95.27 (UDPipe remix_3) .. 96.63 (Trankit base) .. 98.80 (Trankit large). Epoch 0 dev already gave Sentences F1 93.75 on 6.6-sentence paragraphs.
+
+### Reference benchmarks for French sentence segmentation (collected 2026-11-12)
+French-GSD, raw text, CoNLL-18 F1. Different UD releases, so compare as order of magnitude; ALSI's test set is a corrected GSD, so run reference tools on it for a strict comparison.
+| System | UD release | Sentences F1 | Tokens/Words F1 | Source |
+|---|---|---|---|---|
+| Trankit large | 2.5 | 98.80 | 99.77 / 99.72 | trankit.readthedocs.io/en/latest/performance.html |
+| Trankit base | 2.5 | 96.63 | 99.70 | ALSI `R/eval_model.R` (not re-checked online) |
+| Stanza 1.5.1 | 2.12 | 95.03 | 99.71 / 99.50 | stanfordnlp.github.io/stanza/performance (fetched) |
+| Stanza (paper) | 2.5 | 94.92 | 99.68 | Stanza paper / Trankit docs |
+| UDPipe 2 `french-gsd-ud-2.17-251125` | 2.17 | 93.82 | words 98.88 | ufal.mff.cuni.cz/udpipe/2/models (fetched) |
+| UDPipe 1 | 2.5 | 93.59 | 99.68 | Stanza paper / Trankit docs |
+| spaCy v2.3 (old) | 2.5 | 77.30 | 98.34 | Trankit docs |
+Not found: current spaCy `fr_core_news_*` senter F1 (see model card accuracy.json), SaT/wtpsplit French UD F1 (SaT paper arXiv 2406.16678 appendix). Both can be run directly on the ALSI test set.
