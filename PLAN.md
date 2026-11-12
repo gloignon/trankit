@@ -73,3 +73,12 @@ New files `trankit_client.py` / `trankit_client.R` (`trankit_run`, `trankit_anno
 - Final package/CLI name (working names: `trankit-run`).
 - MCP server for agents (deferred).
 - Which French encoder to retrain on, if any.
+
+## Benchmark log (2026-11-12, 600 sentences: UD French GSD test (416) + first 184 dev; one sentence per line)
+| model | device | time | aligned sents | UPOS | LEMMA | UAS | LAS |
+|---|---|---|---|---|---|---|---|
+| custom French (`customized-mwt`) | CPU | 94 s | 575/600 | .9686 | .9718 | .9514 | .9364 |
+| custom French | MPS | 89 s | 575/600 | .9686 | .9718 | .9514 | .9364 |
+| stock multilingual `french` | CPU | 120 s | 563/600 | .9781 | .9574 | .9433 | .9238 |
+| stock multilingual `french` | MPS | 117 s | 563/600 | .9781 | .9574 | .9433 | .9238 |
+CPU and MPS outputs are byte-identical for both models. Scores only cover sentences whose token count matches gold (sets differ, so not strictly comparable). Bug found and fixed: `masked_scatter_` in `crf_layer.py` is unsupported on MPS (stock model loads NER).
