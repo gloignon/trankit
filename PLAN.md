@@ -108,3 +108,11 @@ Steps
 ### Full training run (started 2026-11-12 on c64917.local)
 `scripts/train_camembert_fr.sh` (in `~/trankit_run`, log `logs/full.log`, output `models/camembert_fr/almanach--camembert-base/customized-mwt/`): tokenizer 20 epochs, posdep 25 epochs, then MWT + lemmatizer copied from the XLM-R model (encoder-independent). Data: ALSI `data/augmented` train/dev, paragraph-structured tokenizer text (mean 6.6 sentences). Smoke test on the MacBook passed (tokenizer + posdep, 1 epoch). Tokenizer ran at ~1 s/batch of 16 (133 batches/epoch).
 Next: evaluate (gold-tok UPOS/LEMMA/UAS/LAS on `data/filtered` test; sentence-boundary F1 on multi-sentence paragraphs vs the old model and syntok), then repoint the clients.
+
+## Training gotchas (learned the hard way)
+1. **CoNLL-U must end with an empty line.** Trankit scores the dev set after every epoch with the CoNLL-18 evaluator, which raises `UDError: The CoNLL-U file does not end with empty line`. The failure only appears AFTER epoch 0, so a tiny smoke subset that happens to end with a blank line hides it. The ALSI `data/augmented/*.conllu` files end with a single `\n` and need one more `\n` appended. `scripts/train.py` now refuses to start if train/dev CoNLL-U do not end with `\n\n`.
+2. **Tokenizer text needs multi-sentence paragraphs** (blank-line separated, mean ~6 sentences), otherwise the tokenizer learns one sentence per text and never splits. Build it with `scripts/prepare_tokenizer_data.py`.
+3. **Shell scripts: do not write `[ -f x ] || { cmd && touch x; }` under `set -e`.** A failing `cmd` inside a `||` list does not stop the script, so a crashed task looked finished and the next task started. Use `if [ ! -f x ]; then cmd; touch x; fi`.
+4. **MPS (torch 2.0.1, macOS 26):** `cross_entropy` crashes (SIGBUS), so the loss is computed on CPU for MPS tensors; `transformers.AdamW` clears `requires_grad` after step 1, so `torch.optim.AdamW` is used. Do not revert these.
+5. **A smoke test must run the whole loop, including dev scoring, for at least 2 epochs** (or at least 1 epoch plus the dev evaluation), and with data prepared the same way as the full run.
+6. Shell hook caveat on the Mac mini: top-level `rsync` calls with extra flags may be silently rewritten; use `bin/trankit-run-deploy`.

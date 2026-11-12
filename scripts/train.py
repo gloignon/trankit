@@ -40,6 +40,11 @@ def main():
     a = ap.parse_args()
     bs = dict(BATCH)
     bs.update({k: int(v) for k, v in (x.split("=") for x in a.batch_size)})
+    for f in (a.train_conllu, a.dev_conllu):
+        with open(f, "rb") as fh:
+            fh.seek(max(0, f.stat().st_size - 2))
+            if fh.read() != b"\n\n":
+                sys.exit(f"{f}: CoNLL-U must end with an empty line (Trankit's scorer fails after epoch 0 otherwise)")
     a.output.mkdir(parents=True, exist_ok=True)
     for task in a.tasks:
         if task == "tokenize" and not (a.train_txt and a.dev_txt):

@@ -16,3 +16,15 @@ encoder it was trained on.
 Remote: `--remote HOST` (or `TRANKIT_REMOTE`) needs key-based ssh + rsync. Code (`bin/`, `trankit/`) syncs every run;
 `runtime/` and `model/` only first time or with `--remote-sync`. Default remote dir `~/trankit_run`; device defaults to mps.
 The API runs remotely with `ssh HOST ~/trankit_run/bin/trankit-run-api`. Clients: `/Volumes/Data/pipelines/clients/trankit_client.{py,R}`.
+
+## Training a model
+```sh
+python3 scripts/prepare_tokenizer_data.py TRAIN.conllu TRAIN.txt      # multi-sentence paragraphs (REQUIRED for sentence splitting)
+python3 scripts/prepare_tokenizer_data.py DEV.conllu DEV.txt
+runtime/bin/python scripts/train.py --train-conllu TRAIN.conllu --dev-conllu DEV.conllu \
+    --train-txt TRAIN.txt --dev-txt DEV.txt --output models/NAME --embedding almanach/camembert-base --device mps
+```
+Requirements: CoNLL-U files must end with an empty line (`train.py` checks); tokenizer text must contain multi-sentence
+paragraphs, not one sentence each. Train on the remote host (`bin/trankit-run-deploy HOST --data DIR --hf-model DIR`),
+not on a small machine. MWT expander and lemmatizer do not depend on the encoder and can be copied from an existing model.
+See PLAN.md "Training gotchas".

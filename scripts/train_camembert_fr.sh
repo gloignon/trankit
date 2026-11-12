@@ -11,9 +11,15 @@ PY=runtime/bin/python
 COMMON="--train-conllu training/train.conllu --dev-conllu training/dev.conllu --train-txt training/train.txt --dev-txt training/dev.txt --output $OUT --embedding $ENC --category $CAT --device mps"
 mkdir -p logs "$OUT"
 echo "[$(date)] start tokenizer ($TOK_EPOCHS epochs)"
-[ -f "$OUT/.tokenize.done" ] || { $PY scripts/train.py $COMMON --tasks tokenize --max-epoch "$TOK_EPOCHS" && touch "$OUT/.tokenize.done"; }
+if [ ! -f "$OUT/.tokenize.done" ]; then
+    $PY scripts/train.py $COMMON --tasks tokenize --max-epoch "$TOK_EPOCHS"
+    touch "$OUT/.tokenize.done"
+fi
 echo "[$(date)] start posdep ($POS_EPOCHS epochs)"
-[ -f "$OUT/.posdep.done" ] || { $PY scripts/train.py $COMMON --tasks posdep --max-epoch "$POS_EPOCHS" && touch "$OUT/.posdep.done"; }
+if [ ! -f "$OUT/.posdep.done" ]; then
+    $PY scripts/train.py $COMMON --tasks posdep --max-epoch "$POS_EPOCHS"
+    touch "$OUT/.posdep.done"
+fi
 echo "[$(date)] reuse MWT + lemma from $OLD"
 D="$OUT/$KEY/$CAT"
 cp "$OLD/$CAT""_mwt_expander.pt" "$OLD/$CAT""_lemmatizer.pt" "$D/"
