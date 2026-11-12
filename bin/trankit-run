@@ -1,0 +1,12 @@
+#!/bin/sh
+# Usage: trankit-run INPUT --out DIR [--split lines|syntok|spacy|none] [--device cpu|mps|cuda]
+#                    [--model-dir DIR] [--category NAME] [--embedding ID] [--overwrite]
+#                    [--max-sent-tokens N] [--strict]
+#                    [--remote [USER@]HOST [--remote-dir DIR] [--remote-sync]]
+# With --remote (or TRANKIT_REMOTE=HOST) the run is delegated to bin/trankit-run-remote.
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -n "${TRANKIT_REMOTE:-}" ]; then exec "$HERE/bin/trankit-run-remote" "$@"; fi
+for a; do
+    case "$a" in --remote|--remote=*) exec "$HERE/bin/trankit-run-remote" "$@" ;; esac
+done
+exec "$HERE/bin/_py" trankit.service.cli "$@"

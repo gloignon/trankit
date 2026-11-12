@@ -1,0 +1,9 @@
+#!/bin/sh
+# Internal: run `python -m`-style entry points with the runtime and this checkout's trankit package.
+# usage: _py MODULE [args...]
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+PY="$HERE/runtime/bin/python"
+[ -x "$PY" ] || { echo "trankit-run: $PY missing (run scripts/build_runtime.sh)" >&2; exit 1; }
+MOD="$1"; shift
+export TRANKIT_HOME="$HERE"
+exec "$PY" -I -c "import sys,runpy; sys.path.insert(0, '$HERE'); sys.argv[0]='$MOD'; runpy.run_module('$MOD', run_name='__main__', alter_sys=True)" "$@"

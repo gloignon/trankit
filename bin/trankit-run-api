@@ -1,0 +1,5 @@
+#!/bin/sh
+# JSON Lines API on stdin/stdout. Options: --device --model-dir --category --embedding.
+# Remote: ssh HOST '~/trankit_run/bin/trankit-run-api --device mps'
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+exec "$HERE/bin/_py" trankit.service.api "$@"

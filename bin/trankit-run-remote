@@ -1,0 +1,104 @@
+#!/bin/sh
+# Run trankit-run on another Mac over SSH, then pull the results back.
+#
+#   trankit-run INPUT --out DIR [parse options] --remote [USER@]HOST
+#                    [--remote-dir DIR] [--remote-sync]
+#
+#   --remote HOST     SSH target (or env TRANKIT_REMOTE). Needs key-based SSH.
+#   --remote-dir DIR  trankit_run location on HOST (default: ~/trankit_run; env TRANKIT_REMOTE_DIR)
+#   --remote-sync     also copy runtime/ and model/ (several GB) to HOST. Needed once, or
+#                     after changing them; code (bin/, trankit/) is always synced.
+#
+# Device defaults to mps on the remote unless --device is given. Resume works:
+# the existing manifest/.conllu in OUT are pushed first, so finished docs are skipped.
+set -eu
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+
+REMOTE="${TRANKIT_REMOTE:-}"
+RDIR="${TRANKIT_REMOTE_DIR:-trankit_run}"   # relative to remote $HOME unless absolute
+SYNC=0 INPUT="" OUT="" HAS_DEVICE=0
+PASS=""   # shell-quoted passthrough args for parse.py (positional input/out excluded)
+
+q() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --remote) REMOTE="$2"; shift 2 ;;
+        --remote=*) REMOTE="${1#*=}"; shift ;;
+        --remote-dir) RDIR="$2"; shift 2 ;;
+        --remote-sync) SYNC=1; shift ;;
+        --out) OUT="$2"; shift 2 ;;
+        --device) HAS_DEVICE=1; PASS="$PASS --device $(q "$2")"; shift 2 ;;
+        --split) PASS="$PASS --split $(q "$2")"; shift 2 ;;
+        --max-sent-tokens|--category|--embedding|--model-dir) PASS="$PASS $1 $(q "$2")"; shift 2 ;;
+        -*) PASS="$PASS $(q "$1")"; shift ;;
+        *) INPUT="$1"; shift ;;
+    esac
+done
+
+[ -n "$REMOTE" ] || { echo "trankit-run-remote: no host (use --remote HOST)" >&2; exit 2; }
+[ -n "$INPUT" ] && [ -n "$OUT" ] || { echo "trankit-run-remote: INPUT and --out are required" >&2; exit 2; }
+[ "$HAS_DEVICE" = 1 ] || PASS="$PASS --device mps"
+[ -e "$INPUT" ] || { echo "trankit-run-remote: $INPUT not found" >&2; exit 2; }
+
+SSH="ssh -o BatchMode=yes -o ConnectTimeout=10"
+RSYNC="rsync -a --partial -e 'ssh -o BatchMode=yes -o ConnectTimeout=10'"
+
+echo "remote: checking $REMOTE" >&2
+$SSH "$REMOTE" true 2>/dev/null || {
+    echo "trankit-run-remote: cannot SSH to $REMOTE non-interactively." >&2
+    echo "  Trust the host and install your key once:  ssh-copy-id $REMOTE" >&2
+    exit 1; }
+
+# Resolve the remote directory to an absolute path (and create it).
+RABS="$($SSH "$REMOTE" "mkdir -p $(q "$RDIR") && cd $(q "$RDIR") && pwd")"
+
+# Code is always synced; the heavy runtime/model only on request or when absent.
+eval "$RSYNC" --delete "$HERE/bin/" "$REMOTE:$RABS/bin/"
+eval "$RSYNC" --delete --exclude __pycache__ --exclude tests "$HERE/trankit/" "$REMOTE:$RABS/trankit/"
+if [ "$SYNC" = 1 ] || ! $SSH "$REMOTE" "[ -d $(q "$RABS/runtime/lib") ] "; then
+    echo "remote: syncing runtime/ and model/ (large; first run only)" >&2
+    eval "$RSYNC" --exclude __pycache__ "$HERE/runtime/" "$REMOTE:$RABS/runtime/"
+    [ -d "$HERE/model" ] && eval "$RSYNC" "$HERE/model/" "$REMOTE:$RABS/model/"
+fi
+# The synced venv points at the sender's Homebrew python@3.10. If that doesn't run on the
+# remote, fetch a standalone Python 3.10 with uv (user-level install, no Homebrew/sudo) into
+# <remote-dir>/python and repoint the remote venv at it. Idempotent.
+$SSH "$REMOTE" "sh -s" "$RABS" <<'BOOT'
+set -eu
+R="$1"
+"$R/runtime/bin/python" -I -c 'import sys; assert sys.version_info[:2]==(3,10)' 2>/dev/null && exit 0
+echo "remote: runtime python missing; installing standalone Python 3.10 via uv" >&2
+export PATH="$HOME/.local/bin:$PATH"
+command -v uv >/dev/null 2>&1 || curl -fsSL https://astral.sh/uv/install.sh | sh >&2
+uv python install 3.10 --install-dir "$R/python" >&2
+PYBIN="$(ls -d "$R"/python/cpython-3.10*/bin/python3.10 | head -1)"
+[ -x "$PYBIN" ] || { echo "remote: python 3.10 install failed" >&2; exit 1; }
+ln -sf "$PYBIN" "$R/runtime/bin/python"
+sed -i '' "s|^home = .*|home = $(dirname "$PYBIN")|" "$R/runtime/pyvenv.cfg"
+"$R/runtime/bin/python" -I -c "import sys; sys.path.insert(0, '$R'); import trankit" >&2
+BOOT
+
+# Per-run scratch dir on the remote.
+JOB="$RABS/jobs/$(date +%Y%m%d-%H%M%S)-$$"
+$SSH "$REMOTE" "mkdir -p $(q "$JOB/in") $(q "$JOB/out")"
+trap '$SSH "$REMOTE" "rm -rf $(q "$JOB")" >/dev/null 2>&1 || true' EXIT
+
+# Push input (file or directory contents) and any prior results for resume.
+if [ -d "$INPUT" ]; then
+    RIN="$JOB/in"; eval "$RSYNC" "$(q "${INPUT%/}/")" "$REMOTE:$(q "$RIN/")"
+else
+    RIN="$JOB/in/$(basename "$INPUT")"; eval "$RSYNC" "$(q "$INPUT")" "$REMOTE:$(q "$RIN")"
+fi
+mkdir -p "$OUT"
+eval "$RSYNC" "$(q "${OUT%/}/")" "$REMOTE:$(q "$JOB/out/")"
+
+echo "remote: parsing on $REMOTE" >&2
+rc=0
+# -t not used: keep stderr progress lines streaming through unchanged.
+$SSH "$REMOTE" "$(q "$RABS/bin/trankit-run") $(q "$RIN") --out $(q "$JOB/out") $PASS" || rc=$?
+
+# Pull back whatever was finished, even after a partial failure, so runs resume.
+eval "$RSYNC" "$REMOTE:$(q "$JOB/out/")" "$(q "${OUT%/}/")"
+echo "remote: results in $OUT (exit $rc)" >&2
+exit "$rc"
