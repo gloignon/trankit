@@ -148,4 +148,4 @@ LICENSE (checked 2026-11-12): CEAAL2 (Catherine David, LIDILEM / ORTOLANG v2, ha
 Local TSV has 233 of the 292 texts (the PDF extraction may have missed some).
 Data: `/Volumes/Data/research_data/CEAAL2/derived/ceaal2.tsv` (233 texts: 160 learner [sinophone, polish, russian, indonesian] + 73 native; formal letters / argumentative essays; median 261 words). Sample: 24 texts (6 native + 18 learner), seed 11, `scripts/seg_l2_sample.py`; per-system spans in `eval/p_*.json`.
 Gold = boundaries on which syntok, Stanza and SaT all agree + manual decisions on the disputed ones (`eval/l2_review.tsv`, 40 rows, `suggest` = majority vote; fill `decision` with y/n to override). Then `scripts/seg_l2_review.py gold` builds the gold spans. Old XLM-R Trankit found 226 sentences on these texts vs 368-388 for the others.
-Open question: letter headers (name, address, date, "Madame, Monsieur") are glued to the first sentence by every system; decide whether to exclude them from scoring.
+Decision (user, 2026-11-12): letter headers and essay titles are EXCLUDED from scoring (`scripts/seg_l2_trim.py`; cut at the salutation or title question). Review sheet now has 25 rows.
