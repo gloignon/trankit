@@ -82,3 +82,17 @@ New files `trankit_client.py` / `trankit_client.R` (`trankit_run`, `trankit_anno
 | stock multilingual `french` | CPU | 120 s | 563/600 | .9781 | .9574 | .9433 | .9238 |
 | stock multilingual `french` | MPS | 117 s | 563/600 | .9781 | .9574 | .9433 | .9238 |
 CPU and MPS outputs are byte-identical for both models. Scores only cover sentences whose token count matches gold (sets differ, so not strictly comparable). Bug found and fixed: `masked_scatter_` in `crf_layer.py` is unsupported on MPS (stock model loads NER).
+
+## Phase 8: train a new French model (CamemBERT encoder, real sentence splitting, MPS on the MacBook)
+Goal: a Trankit model that (1) uses `almanach/camembert-base` (large/distil optional), (2) segments sentences inside running text, (3) trains on MPS on c64917.local.
+
+Finding (2026-11-12): the existing custom model's tokenizer was trained on 14,586 paragraphs of exactly ONE sentence each (mean 1.0 in `fr_gsd-ud-train.txt.character`), so it never saw a sentence boundary inside a text and under-splits. ALSI works around it with syntok + per-sentence parsing (`is_sent=True`). The posdep/lemma tasks are unaffected (sentence-level by nature).
+Rule: tokenizer training text MUST be multi-sentence paragraphs; the training-data prep script enforces it.
+
+Steps
+- [x] `scripts/prepare_tokenizer_data.py`: group consecutive sentences into paragraphs of 1..12 (mean ~6.6), blank-line separated; conllu unchanged.
+- [x] `scripts/train.py`: tokenize / mwt / posdep / lemmatize, `--embedding`, `--device`, `--max-epoch`, per-task batch size.
+- [ ] Local smoke test on MPS (300 train sentences, 1 epoch, all 4 tasks).
+- [ ] Full run on the MacBook (data: ALSI `data/augmented` train+dev, test = `data/filtered/fr_gsd-ud-test.conllu`); pick epochs/batch from smoke timings.
+- [ ] Evaluate: (a) gold-tokenization UPOS/LEMMA/UAS/LAS (as ALSI `eval_trankit.py`), (b) sentence-boundary F1 on multi-sentence paragraphs, (c) against current XLM-R model + syntok.
+- [ ] Optional: reuse existing MWT/lemma models (encoder-independent) if retraining them is slow on CPU.
