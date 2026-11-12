@@ -9,7 +9,7 @@ class NERClassifier(nn.Module):
     def __init__(self, config, language):
         super().__init__()
         self.config = config
-        self.xlmr_dim = 768 if config.embedding_name == 'xlm-roberta-base' else 1024
+        self.xlmr_dim = embedding_dim(config)
         self.entity_label_stoi = config.ner_vocabs[language]  # BIOES tags
         self.entity_label_itos = {i: s for s, i in self.entity_label_stoi.items()}
         self.entity_label_num = len(self.entity_label_stoi)
@@ -65,7 +65,7 @@ class PosDepClassifier(nn.Module):
         super().__init__()
         self.config = config
         self.vocabs = config.vocabs[treebank_name]
-        self.xlmr_dim = 768 if config.embedding_name == 'xlm-roberta-base' else 1024
+        self.xlmr_dim = embedding_dim(config)
         self.upos_embedding = nn.Embedding(
             num_embeddings=len(self.vocabs[UPOS]),
             embedding_dim=50
@@ -184,7 +184,7 @@ class TokenizerClassifier(nn.Module):
     def __init__(self, config, treebank_name):
         super().__init__()
         self.config = config
-        self.xlmr_dim = 768 if config.embedding_name == 'xlm-roberta-base' else 1024
+        self.xlmr_dim = embedding_dim(config)
         self.tokenizer_ffn = nn.Linear(self.xlmr_dim, 5)
 
         # loss function

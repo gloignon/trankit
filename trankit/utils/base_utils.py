@@ -92,6 +92,8 @@ def unzip(dir, filename):
 
 
 def download(cache_dir, language, saved_model_version, embedding_name):  # put a try-catch here
+    if embedding_name not in ('xlm-roberta-base', 'xlm-roberta-large'):
+        return  # custom encoder: no official download; model files must already be in cache_dir
     lang_dir = os.path.join(cache_dir, embedding_name, language)
     save_fpath = os.path.join(lang_dir, '{}.zip'.format(language))
 

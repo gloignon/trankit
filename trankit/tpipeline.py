@@ -18,7 +18,7 @@ from .utils.chuliu_edmonds import *
 from .device import resolve_device
 from tqdm import tqdm
 from transformers import AdamW, get_linear_schedule_with_warmup
-from transformers import XLMRobertaTokenizer
+from .encoder import set_embedding, load_tokenizer
 import logging
 
 
@@ -128,9 +128,7 @@ class TPipeline:
 
         # set embedding name
         self.master_config = MasterConfig()
-        self.master_config.embedding_name = 'xlm-roberta-base' if 'embedding' not in training_config else training_config['embedding']
-        assert self.master_config.embedding_name in supported_embeddings, '{} has not been supported.\nSupported embeddings: {}'.format(
-            self.master_config.embedding_name, supported_embeddings)
+        set_embedding(self.master_config, training_config.get('embedding', 'xlm-roberta-base'))
 
         # lang and data
         self._lang = training_config['category'] if 'category' in training_config else 'customized'
@@ -213,8 +211,7 @@ class TPipeline:
 
         # wordpiece splitter
         if self._task not in ['mwt', 'lemmatize']:
-            self.master_config.wordpiece_splitter = XLMRobertaTokenizer.from_pretrained(self.master_config.embedding_name,
-                                                                                   cache_dir=self.master_config._save_dir)
+            self.master_config.wordpiece_splitter = load_tokenizer(self.master_config, cache_dir=self.master_config._save_dir)
 
     def _prepare_tokenize(self):
         self.train_set = TokenizeDataset(

@@ -11,7 +11,6 @@ __version__ = "1.1.2"
 
 def download_missing_files(category, save_dir, embedding_name, language):
     assert language in supported_langs, '{} is not a pretrained language. Current pretrained languages: {}'.format(language, supported_langs)
-    assert embedding_name in supported_embeddings, '{} has not been supported. Current supported embeddings: {}'.format(embedding_name, supported_embeddings)
 
     import os
     assert category in {'customized', 'customized-ner', 'customized-mwt',
@@ -77,8 +76,6 @@ def download_missing_files(category, save_dir, embedding_name, language):
 
 
 def verify_customized_pipeline(category, save_dir, embedding_name):
-    assert embedding_name in supported_embeddings, '{} has not been supported. Current supported embeddings: {}'.format(
-        embedding_name, supported_embeddings)
     assert category in {'customized', 'customized-ner', 'customized-mwt',
                         'customized-mwt-ner'}, "Pipeline category must be one of the following: 'customized', 'customized-ner', 'customized-mwt', 'customized-mwt-ner'"
     if category == 'customized':

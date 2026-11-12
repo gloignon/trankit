@@ -19,7 +19,7 @@ from adapters.loading import AdapterLoader
 from datetime import datetime
 import langid
 import gc as _gc_mod
-from transformers import XLMRobertaTokenizer
+from .encoder import set_embedding, load_tokenizer, embedding_dim
 
 _GC_EVERY = 200  # Avoid a costly full collection at every pipeline stage.
 _gc_calls = 0
@@ -67,10 +67,9 @@ class Pipeline:
             self.auto_mode = False
 
         # set the embedding type
-        assert embedding in supported_embeddings, f'{embedding} has not been supported.\nSupported embeddings: {supported_embeddings}'
-
+        # official: xlm-roberta-base/large; otherwise any SentencePiece-based HF model id or local dir
         self.master_config = MasterConfig()
-        self.master_config.embedding_name = embedding
+        set_embedding(self.master_config, embedding)
 
         self._cache_dir = cache_dir
         self._gpu = gpu
@@ -94,7 +93,7 @@ class Pipeline:
         self._load_vocabs()
 
         # shared multilingual embeddings
-        print('Loading pretrained XLM-Roberta, this may take a while...')
+        print('Loading pretrained encoder {}, this may take a while...'.format(self.master_config.embedding_source))
         self._embedding_layers = Multilingual_Embedding(self._config)
         self._embedding_layers.to(self._config.device)
         if self._use_gpu:
@@ -176,10 +175,7 @@ class Pipeline:
         if not os.path.exists(self.master_config._cache_dir):
             os.makedirs(self.master_config._cache_dir, exist_ok=True)
 
-        self.master_config.wordpiece_splitter = XLMRobertaTokenizer.from_pretrained(self.master_config.embedding_name,
-                                                                               cache_dir=os.path.join(
-                                                                                   self.master_config._cache_dir,
-                                                                                   self.master_config.embedding_name))
+        self.master_config.wordpiece_splitter = load_tokenizer(self.master_config)
         self._config = self.master_config
         self._config.active_adapter = 'None'
         self._config.max_input_length = tbname2max_input_length.get(lang2treebank[lang],
@@ -486,7 +482,7 @@ class Pipeline:
 
     def _tokenize_sent(self, in_sent):  # assuming input is a sentence
         eval_batch_size = tbname2tokbatchsize.get(lang2treebank[self.active_lang], self._tokbatchsize)
-        if self._config.embedding_name == 'xlm-roberta-large':
+        if embedding_dim(self._config) >= 1024:
             eval_batch_size = int(eval_batch_size / 2)
 
         # load input text
@@ -606,7 +602,7 @@ class Pipeline:
 
     def _tokenize_doc(self, in_doc):  # assuming input is a document
         eval_batch_size = tbname2tokbatchsize.get(lang2treebank[self.active_lang], self._tokbatchsize)
-        if self._config.embedding_name == 'xlm-roberta-large':
+        if embedding_dim(self._config) >= 1024:
             eval_batch_size = int(eval_batch_size / 2)
         # load input text
         config = self._config
@@ -791,7 +787,7 @@ class Pipeline:
 
         # make predictions
         eval_batch_size = tbname2tagbatchsize.get(self._config.treebank_name, self._tagbatchsize)
-        if self._config.embedding_name == 'xlm-roberta-large':
+        if embedding_dim(self._config) >= 1024:
             eval_batch_size = int(eval_batch_size / 3)
 
         for batch in DataLoader(test_set,
@@ -877,7 +873,7 @@ class Pipeline:
 
         # make predictions
         eval_batch_size = tbname2tagbatchsize.get(self._config.treebank_name, self._tagbatchsize)
-        if self._config.embedding_name == 'xlm-roberta-large':
+        if embedding_dim(self._config) >= 1024:
             eval_batch_size = int(eval_batch_size / 3)
 
         for batch in DataLoader(test_set,
@@ -1073,7 +1069,7 @@ class Pipeline:
         # load ner adapter weights
         self._load_adapter_weights(model_name='ner')
         eval_batch_size = tbname2tagbatchsize.get(self._config.treebank_name, self._tagbatchsize)
-        if self._config.embedding_name == 'xlm-roberta-large':
+        if embedding_dim(self._config) >= 1024:
             eval_batch_size = int(eval_batch_size / 3)
 
         for batch in DataLoader(test_set,
@@ -1111,7 +1107,7 @@ class Pipeline:
         # load ner adapter weights
         self._load_adapter_weights(model_name='ner')
         eval_batch_size = tbname2tagbatchsize.get(self._config.treebank_name, self._tagbatchsize)
-        if self._config.embedding_name == 'xlm-roberta-large':
+        if embedding_dim(self._config) >= 1024:
             eval_batch_size = int(eval_batch_size / 3)
 
         for batch in DataLoader(test_set,
