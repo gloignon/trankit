@@ -1,0 +1,24 @@
+#!/bin/sh
+# Deploy code (and optionally data / HF model caches) to a remote host's trankit_run dir.
+#   trankit-run-deploy HOST [--remote-dir DIR] [--data DIR]... [--hf-model HUB_DIR/models--org--name]...
+# Code (bin/, trankit/, scripts/) always; runtime/ and model/ via trankit-run --remote-sync.
+set -eu
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+HOST="$1"; shift
+RDIR="${TRANKIT_REMOTE_DIR:-trankit_run}"
+SSH="ssh -o BatchMode=yes -o ConnectTimeout=10"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --remote-dir) RDIR="$2"; shift 2 ;;
+        --data) DATA="${DATA:-} $2"; shift 2 ;;
+        --hf-model) HF="${HF:-} $2"; shift 2 ;;
+        *) echo "unknown option $1" >&2; exit 2 ;;
+    esac
+done
+$SSH "$HOST" "mkdir -p $RDIR/training $RDIR/hf_cache/hub"
+rsync -a --delete --exclude __pycache__ --exclude tests -e "$SSH" "$HERE/trankit/" "$HOST:$RDIR/trankit/"
+rsync -a --delete -e "$SSH" "$HERE/bin/" "$HOST:$RDIR/bin/"
+rsync -a --delete -e "$SSH" "$HERE/scripts/" "$HOST:$RDIR/scripts/"
+for d in ${DATA:-}; do rsync -a -e "$SSH" "$d/" "$HOST:$RDIR/training/"; done
+for m in ${HF:-}; do rsync -aL -e "$SSH" "$m" "$HOST:$RDIR/hf_cache/hub/"; done
+echo "deployed to $HOST:$RDIR" >&2

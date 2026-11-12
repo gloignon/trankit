@@ -104,3 +104,7 @@ Steps
   2. `transformers.AdamW.step` on MPS clears `requires_grad` on all params after step 1 (batch 2 then fails) -> use `torch.optim.AdamW(eps=1e-6)` (tpipeline.py).
   3. Observed ~14 s/iteration (batch 16) on the mini for the tokenizer task; MacBook speed unknown.
 - If MPS training stays unreliable on torch 2.0.1, try a newer torch in a separate runtime on the MacBook (the pin was already relaxed in setup.py).
+
+### Full training run (started 2026-11-12 on c64917.local)
+`scripts/train_camembert_fr.sh` (in `~/trankit_run`, log `logs/full.log`, output `models/camembert_fr/almanach--camembert-base/customized-mwt/`): tokenizer 20 epochs, posdep 25 epochs, then MWT + lemmatizer copied from the XLM-R model (encoder-independent). Data: ALSI `data/augmented` train/dev, paragraph-structured tokenizer text (mean 6.6 sentences). Smoke test on the MacBook passed (tokenizer + posdep, 1 epoch). Tokenizer ran at ~1 s/batch of 16 (133 batches/epoch).
+Next: evaluate (gold-tok UPOS/LEMMA/UAS/LAS on `data/filtered` test; sentence-boundary F1 on multi-sentence paragraphs vs the old model and syntok), then repoint the clients.
