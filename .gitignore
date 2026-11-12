@@ -139,3 +139,6 @@ cache/trankit/
 
 # CEAAL2 excerpts / annotations: CC BY-NC-ND, never commit or redistribute
 /eval/
+
+# accidental local mirrors of a remote host dir (mangled rsync target such as "host:dir" -> "hostdir")
+/c64917.local*
