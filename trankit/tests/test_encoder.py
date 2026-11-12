@@ -43,6 +43,16 @@ class EncoderTests(unittest.TestCase):
             self.assertEqual(m.xlmr_dim, 64)
             self.assertTrue(load_tokenizer(c).tokenize('bonjour le monde'))
 
+    @unittest.skipUnless(os.environ.get('TRANKIT_TEST_HF_MODEL'), 'set TRANKIT_TEST_HF_MODEL (e.g. almanach/camembert-base)')
+    def test_hf_model(self):
+        from trankit.models.base_models import Multilingual_Embedding
+        c = Config()
+        c._cache_dir = tempfile.gettempdir()
+        set_embedding(c, os.environ['TRANKIT_TEST_HF_MODEL'])
+        m = Multilingual_Embedding(c)
+        self.assertEqual(m.xlmr_dim, embedding_dim(c))
+        self.assertTrue(load_tokenizer(c).tokenize('Les enfants jouent.'))
+
 
 def _cfg(src):
     c = Config()

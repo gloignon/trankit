@@ -58,16 +58,32 @@ def adapter_reduction_factor(dim):
 
 
 def _hf_cache(config):
-    return os.path.join(config._cache_dir, config.embedding_name)
+    # Official XLM-R keeps Trankit's own cache layout; custom encoders use the standard
+    # Hugging Face cache (HF_HOME / HF_HUB_CACHE) so models already cached there are reused.
+    if is_official(config.embedding_source):
+        return os.path.join(config._cache_dir, config.embedding_name)
+    return None
+
+
+# Architecturally identical to XLM-R/RoBERTa but unknown to the ``adapters`` library under their own name.
+_ROBERTA_LAYOUT = {'camembert', 'roberta', 'xlm-roberta'}
 
 
 def load_encoder(config):
-    return AutoModel.from_pretrained(config.embedding_source, cache_dir=_hf_cache(config),
-                                     output_hidden_states=True)
+    cache = _hf_cache(config)
+    hf_config = AutoConfig.from_pretrained(config.embedding_source, cache_dir=cache)
+    hf_config.output_hidden_states = True
+    if hf_config.model_type in _ROBERTA_LAYOUT:
+        from transformers import XLMRobertaConfig, XLMRobertaModel
+        d = hf_config.to_dict()
+        d.pop('model_type', None)
+        return XLMRobertaModel.from_pretrained(config.embedding_source, cache_dir=cache,
+                                               config=XLMRobertaConfig.from_dict(d))
+    return AutoModel.from_pretrained(config.embedding_source, cache_dir=cache, config=hf_config)
 
 
 def load_tokenizer(config, cache_dir=None):
-    tok = AutoTokenizer.from_pretrained(config.embedding_source, cache_dir=cache_dir or _hf_cache(config),
+    tok = AutoTokenizer.from_pretrained(config.embedding_source, cache_dir=cache_dir if (cache_dir and is_official(config.embedding_source)) else _hf_cache(config),
                                         use_fast=False)  # slow tokenizer: matches stock Trankit behavior
     pieces = tok.tokenize('hello world')
     if not any(p.startswith('▁') for p in pieces):
