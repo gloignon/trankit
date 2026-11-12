@@ -64,7 +64,13 @@ def gold(texts_json, sheet_tsv, out, base_files):
         cuts = set(agreed) | {o for (tid, o), v in dec.items() if tid == t["id"] and v}
         cuts = sorted(c for c in cuts if not any((t["id"], c) in dec and not dec[(t["id"], c)] for _ in [0]))
         bounds = [0] + cuts + [len(t["text"])]
-        res[t["id"]] = [[a, b] for a, b in zip(bounds, bounds[1:]) if t["text"][a:b].strip()]
+        spans = []
+        for a, b in zip(bounds, bounds[1:]):
+            seg = t["text"][a:b]
+            if seg.strip():  # trim whitespace so spans compare equal to the (trimmed) predicted spans
+                a2 = a + len(seg) - len(seg.lstrip())
+                spans.append([a2, a2 + len(seg.strip())])
+        res[t["id"]] = spans
     json.dump(res, open(out, "w"))
     print(sum(len(v) for v in res.values()), "gold sentences in", len(res), "texts")
 
