@@ -142,3 +142,10 @@ Data: ALSI `data/filtered/fr_gsd-ud-test.conllu`, 401 gold sentences in 67 raw p
 | Stanza 1.15 (fr, tokenize) | 404 | 95.30 | 96.01 | 95.65 | 85.1% |
 | SaT `sat-3l-sm` (wtpsplit) | 408 | 95.83 | 97.51 | 96.66 | 88.1% |
 | New CamemBERT Trankit | (pending training) | | | | |
+
+### L2 sentence-boundary gold set (CEAAL2) - in progress
+LICENSE (checked 2026-11-12): CEAAL2 (Catherine David, LIDILEM / ORTOLANG v2, handle 11403/ceaal2/v2, 292 texts) is **CC BY-NC-ND 3.0 unported** according to the Hugging Face mirror's metadata (FrancophonIA/ceaal2); the ORTOLANG page itself could not be fetched (TLS error), so confirm it there. NC = no commercial use; ND = no derivative works, so do not redistribute annotated/segmented/corrected versions or excerpts. Therefore `eval/` (texts, spans, review sheet) is git-ignored and stays local; publish at most stand-off offsets, after confirming with the depositor. Policy: CEAAL2 is used for EVALUATION only, never as training data (L2 text contains errors; we do not want the model to learn erroneous categories). Robustness comes from perturbing CLEAN GSD data (e.g. no space after a period, missing capital letters, missing final punctuation) with the original gold labels.
+Local TSV has 233 of the 292 texts (the PDF extraction may have missed some).
+Data: `/Volumes/Data/research_data/CEAAL2/derived/ceaal2.tsv` (233 texts: 160 learner [sinophone, polish, russian, indonesian] + 73 native; formal letters / argumentative essays; median 261 words). Sample: 24 texts (6 native + 18 learner), seed 11, `scripts/seg_l2_sample.py`; per-system spans in `eval/p_*.json`.
+Gold = boundaries on which syntok, Stanza and SaT all agree + manual decisions on the disputed ones (`eval/l2_review.tsv`, 40 rows, `suggest` = majority vote; fill `decision` with y/n to override). Then `scripts/seg_l2_review.py gold` builds the gold spans. Old XLM-R Trankit found 226 sentences on these texts vs 368-388 for the others.
+Open question: letter headers (name, address, date, "Madame, Monsieur") are glued to the first sentence by every system; decide whether to exclude them from scoring.

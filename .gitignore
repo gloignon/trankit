@@ -136,3 +136,6 @@ cache/trankit/
 /runtime/
 /model
 /jobs/
+
+# CEAAL2 excerpts / annotations: CC BY-NC-ND, never commit or redistribute
+/eval/
