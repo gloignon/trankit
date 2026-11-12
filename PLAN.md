@@ -156,3 +156,16 @@ Example: "Le chat est gris": standard UD gives AUX for "est"; the ALSI model giv
 - Evaluate on a retagged gold only: `data/filtered/fr_gsd-ud-test_retagged.conllu` (or retag the test file), never on `treebanks/` or non-retagged files.
 - CORRECTION to the 600-sentence benchmark above: the custom model's UPOS was scored against official gold (copulas AUX). Against ALSI-scheme gold (221 copulas retagged in the sample) it is **UPOS 98.39** (not 96.86); LEMMA/UAS/LAS are unchanged (97.18 / 95.14 / 93.64). Stock multilingual `french` follows the official scheme, 97.81 against official gold.
 Deferred (user, 2026-11-12): causative `faire` (`aux:caus`, 217 tokens in train) stays AUX for now; revisit later (it would need a rule in `retag_aux.R` and a retrain).
+
+### L2 evaluation (provisional, CEAAL2) - numbers only
+Sample: 24 CEAAL2 texts (6 native, 18 learner), headers/titles excluded (`seg_l2_trim.py`), 368 scored gold sentences. CPU, exact sentence-span F1 (boundary F1 = sentence starts only). Gold is PROVISIONAL and CIRCULAR for the baselines: it is built from the boundaries syntok, Stanza and SaT agree on, plus a decision on the 25 boundaries they disagree on. The old Trankit is not a judge.
+Gold A = majority vote on the 25 disputed rows. Gold B = a second opinion by the evaluating agent on the same 25 rows (+1 added boundary before a numbered list item that all baselines missed). The agent disagreed with the majority on 6 of 25 rows (all quotation-mark / ellipsis cases). The user has not reviewed either gold yet.
+| System | Gold A span F1 (all / native / learner) | Gold A boundary F1 | Gold B span F1 (all / native / learner) | Gold B boundary F1 (all) |
+|---|---|---|---|---|
+| syntok | 97.5 / 100.0 / 96.9 | 99.1 | 96.4 / 98.1 / 96.0 | 98.5 |
+| Stanza | 97.1 / 100.0 / 96.4 | 98.1 | 95.2 / 98.1 / 94.5 | 97.2 |
+| SaT (sat-3l-sm) | 98.1 / 98.1 / 98.1 | 99.1 | 99.2 / 100.0 / 99.0 | 99.7 |
+| Old ALSI Trankit (XLM-R) | 54.2 / 73.4 / 48.3 | 73.1 | 54.2 / 71.4 / 48.9 | 73.1 |
+Reading: the old model's span F1 is about 54 (boundary precision 100, recall 58: it never over-splits and misses ~40% of boundaries, worse on learner texts). The three baselines move by 1 to 2 points between golds, so their ranking is not settled until the user confirms the 25 rows. The old-model number is stable across both golds.
+Missed-boundary candidates (all baselines missed; not added to gold unless noted): 1 clear case added to Gold B (question mark followed by a list number); 1 comma-splice-before-capital candidate (learner sinophone text 42, 46 words) left out; 2 other body sentences over 45 words judged genuine long sentences. No punctuation-less run-ons found by a starter-word heuristic.
+Score the new model with `scripts/seg_l2_predict_new.sh MODEL_DIR` (copy the model from the MacBook first).
