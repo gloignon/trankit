@@ -84,20 +84,21 @@ both sentence and document level. Currently, Trankit supports the following task
 - Dependency parsing.
 - Named entity recognition.
 #### Initialize a pretrained pipeline
-The following code shows how to initialize a pretrained pipeline for English; it is instructed to run on GPU, automatically download pretrained models, and store them to the specified cache directory. Trankit will not download pretrained models if they already exist.
+The following code initializes a pretrained pipeline for English and stores downloaded models in the specified cache directory. Trankit will not download pretrained models if they already exist.
 ```python
 from trankit import Pipeline
 
 # initialize a multilingual pipeline
-p = Pipeline(lang='english', gpu=True, cache_dir='./cache')
+p = Pipeline(lang='english', cache_dir='./cache')
 ```
+By default, Trankit uses CUDA when available and otherwise uses CPU. Select a device explicitly with `device='cpu'`, `device='cuda'`, or `device='mps'`; an unavailable requested accelerator raises an error. MPS requires a compatible macOS and PyTorch build. The legacy `gpu` argument remains supported when `device` is omitted.
 
 #### Perform all tasks on the input
 After initializing a pretrained pipeline, it can be used to process the input on all tasks as shown below. If the input is a sentence, the tag `is_sent` must be set to True. 
 ```python
 from trankit import Pipeline
 
-p = Pipeline(lang='english', gpu=True, cache_dir='./cache')
+p = Pipeline(lang='english', device='mps', cache_dir='./cache')
 
 ######## document-level processing ########
 untokenized_doc = '''Hello! This is Trankit.'''

@@ -15,11 +15,11 @@ import trankit
 print(trankit.supported_langs)
 # Output: ['afrikaans', 'ancient-greek-perseus', 'ancient-greek', 'arabic', 'armenian', 'basque', 'belarusian', 'bulgarian', 'catalan', 'chinese', 'traditional-chinese', 'classical-chinese', 'croatian', 'czech-cac', 'czech-cltt', 'czech-fictree', 'czech', 'danish', 'dutch', 'dutch-lassysmall', 'english', 'english-gum', 'english-lines', 'english-partut', 'estonian', 'estonian-ewt', 'finnish-ftb', 'finnish', 'french', 'french-partut', 'french-sequoia', 'french-spoken', 'galician', 'galician-treegal', 'german', 'german-hdt', 'greek', 'hebrew', 'hindi', 'hungarian', 'indonesian', 'irish', 'italian', 'italian-partut', 'italian-postwita', 'italian-twittiro', 'italian-vit', 'japanese', 'kazakh', 'korean', 'korean-kaist', 'kurmanji', 'latin', 'latin-perseus', 'latin-proiel', 'latvian', 'lithuanian', 'lithuanian-hse', 'marathi', 'norwegian-nynorsk', 'norwegian-nynorsklia', 'norwegian-bokmaal', 'old-french', 'old-russian', 'persian', 'polish-lfg', 'polish', 'portuguese', 'portuguese-gsd', 'romanian-nonstandard', 'romanian', 'russian-gsd', 'russian', 'russian-taiga', 'scottish-gaelic', 'serbian', 'slovak', 'slovenian', 'slovenian-sst', 'spanish', 'spanish-gsd', 'swedish-lines', 'swedish', 'tamil', 'telugu', 'turkish', 'ukrainian', 'urdu', 'uyghur', 'vietnamese']
 ```
-By default, *trankit* would try to use GPU if a GPU device is available. However, we can force it to run on CPU by setting the tag `gpu=False`:
+By default, *trankit* uses CUDA when available and otherwise runs on CPU. To choose a device explicitly, set `device` to `'cpu'`, `'cuda'`, or `'mps'`. An explicitly requested accelerator must be available; MPS also requires a compatible macOS and PyTorch build. The legacy `gpu` argument remains supported when `device` is omitted. For example, to force CPU use `device='cpu'` (or the legacy `gpu=False`):
 ```python
 from trankit import Pipeline
 
-p = Pipeline('english', gpu=False)
+p = Pipeline('english', device='cpu')
 ```
 Another tag that we can use is `cache_dir`. By default, *Trankit* would check if the pretrained model files exist. If they don't, it would download all pretrained files including the shared XLMR-related files and the separate language-related files, then store them to `./cache/trankit`. However, we can change this by setting the tag `cache_dir`:
 ```python

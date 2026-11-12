@@ -11,11 +11,22 @@ from collections import defaultdict
 from .utils.conll import *
 from .utils.tbinfo import tbname2training_id, lang2treebank
 from .utils.chuliu_edmonds import *
+from .device import resolve_device
 from adapters.loading import AdapterLoader
 from datetime import datetime
 import langid
-import gc
+import gc as _gc_mod
 from transformers import XLMRobertaTokenizer
+
+_GC_EVERY = 200  # Avoid a costly full collection at every pipeline stage.
+_gc_calls = 0
+
+
+def _collect():
+    global _gc_calls
+    _gc_calls += 1
+    if _gc_calls % _GC_EVERY == 0:
+        _gc_mod.collect()
 
 
 def is_string(input):
@@ -43,7 +54,7 @@ def is_list_list_strings(input):
 
 
 class Pipeline:
-    def __init__(self, lang, cache_dir=None, gpu=True, embedding='xlm-roberta-base'):
+    def __init__(self, lang, cache_dir=None, gpu=True, embedding='xlm-roberta-base', device=None):
         super(Pipeline, self).__init__()
         # auto detection of lang
         if lang == 'auto':
@@ -61,6 +72,7 @@ class Pipeline:
         self._cache_dir = cache_dir
         self._gpu = gpu
         self._use_gpu = gpu
+        self._device_request = device
         self._ud_eval = False
         self._setup_config(lang)
         self._config.training = False
@@ -140,18 +152,18 @@ class Pipeline:
             self.set_active(lang)
 
     def _setup_config(self, lang):
-        torch.cuda.empty_cache()
-        # decide whether to run on GPU or CPU
-        if self._gpu and torch.cuda.is_available():
-            self._use_gpu = True
-            self.master_config.device = torch.device('cuda')
+        self._device = resolve_device(self._device_request, gpu=self._gpu)
+        # Legacy MWT/lemma wrappers only understand CUDA's boolean flag. Keep
+        # them on CPU for MPS while transformer components use self._device.
+        self._use_gpu = self._device.type == 'cuda'
+        self.master_config.device = self._device
+        if self._device.type in ('cuda', 'mps'):
             self._tokbatchsize = 6
             self._tagbatchsize = 24
         else:
-            self._use_gpu = False
-            self.master_config.device = torch.device('cpu')
             self._tokbatchsize = 2
             self._tagbatchsize = 12
+        self._empty_cache()
 
         if self._cache_dir is None:
             self.master_config._cache_dir = 'cache/trankit'
@@ -169,6 +181,10 @@ class Pipeline:
         self._config.active_adapter = 'None'
         self._config.max_input_length = tbname2max_input_length.get(lang2treebank[lang],
                                                                     400)  # this is for tokenizer only
+
+    def _empty_cache(self):
+        if getattr(self, '_device', torch.device('cpu')).type == 'cuda':
+            torch.cuda.empty_cache()
 
     def set_auto(self, state):
         assert type(state) == bool
@@ -357,7 +373,7 @@ class Pipeline:
 
             wordpiece_ends.extend(wp_ends)
             paragraph_indexes.extend(para_ids)
-            torch.cuda.empty_cache()
+            self._empty_cache()
         # mapping
         para_id_to_wp_pred_labels = defaultdict(list)
 
@@ -446,9 +462,9 @@ class Pipeline:
         del all_para_texts 
         del all_para_starts 
 
-        gc.collect()
+        _collect()
 
-        torch.cuda.empty_cache()
+        self._empty_cache()
         return {TEXT: in_doc, SENTENCES: sentences, LANG: self.active_lang}
 
     def tokenize(self, input, is_sent=False):
@@ -577,12 +593,12 @@ class Pipeline:
         del all_para_texts 
         del all_para_starts 
 
-        gc.collect()
+        _collect()
         # multi-word expansion if required
         if tbname2training_id[self._config.treebank_name] % 2 == 1:
             tokens = self._mwt_expand([{TOKENS: tokens}])[0][TOKENS]
 
-        torch.cuda.empty_cache()
+        self._empty_cache()
         return tokens
 
     def _tokenize_doc(self, in_doc):  # assuming input is a document
@@ -707,11 +723,11 @@ class Pipeline:
         del all_para_texts 
         del all_para_starts 
 
-        gc.collect()
+        _collect()
         # multi-word expansion if required
         if tbname2training_id[self._config.treebank_name] % 2 == 1:
             doc = self._mwt_expand(doc)
-        torch.cuda.empty_cache()
+        self._empty_cache()
         return doc
 
     def posdep(self, input, is_sent=False):
@@ -834,10 +850,10 @@ class Pipeline:
             del deprel_seqs 
             del pred_tokens 
 
-        gc.collect()
+        _collect()
 
         tagged_doc = get_output_doc(posdep_sent, test_set.conllu_doc)
-        torch.cuda.empty_cache()
+        self._empty_cache()
         return tagged_doc[0][TOKENS]
 
     def _posdep_doc(self, in_doc):  # assuming input is a document
@@ -920,9 +936,9 @@ class Pipeline:
             del deprel_seqs 
             del pred_tokens 
 
-        gc.collect()
+        _collect()
         tagged_doc = get_output_doc(dposdep_doc, test_set.conllu_doc)
-        torch.cuda.empty_cache()
+        self._empty_cache()
         return tagged_doc
 
     def lemmatize(self, input, is_sent=False):
@@ -974,7 +990,7 @@ class Pipeline:
             self._lemma_model[self._config.active_lang].predict([{ID: 1, TOKENS: in_sent}], obmit_tag)[0][
                 TOKENS]
 
-        gc.collect()
+        _collect()
         return lemmatized_sent
 
     def _lemmatize_doc(self, in_doc, obmit_tag=False):  # assuming input is a document
@@ -984,12 +1000,12 @@ class Pipeline:
 
         lemmatized_doc = self._lemma_model[self._config.active_lang].predict(in_doc, obmit_tag)
 
-        gc.collect()
+        _collect()
         return lemmatized_doc
 
     def _mwt_expand(self, tokenized_doc):
         expanded_doc = self._mwt_model[self._config.active_lang].predict(tokenized_doc)
-        gc.collect()
+        _collect()
         return expanded_doc
 
     def ner(self, input, is_sent=False):
@@ -1075,8 +1091,8 @@ class Pipeline:
             
             del pred_entity_labels
 
-        torch.cuda.empty_cache()
-        gc.collect()
+        self._empty_cache()
+        _collect()
         return dner_doc[0][TOKENS]
 
     def _ner_doc(self, in_doc):  # assuming input is a document
@@ -1113,8 +1129,8 @@ class Pipeline:
 
             del pred_entity_labels
 
-        torch.cuda.empty_cache()
-        gc.collect()
+        self._empty_cache()
+        _collect()
         return dner_doc
 
     def __call__(self, input, is_sent=False):

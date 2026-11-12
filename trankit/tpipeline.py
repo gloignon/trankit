@@ -12,6 +12,7 @@ from collections import defaultdict
 from .utils.conll import *
 from .utils.tbinfo import tbname2training_id, lang2treebank
 from .utils.chuliu_edmonds import *
+from .device import resolve_device
 from tqdm import tqdm
 from transformers import AdamW, get_linear_schedule_with_warmup
 from transformers import XLMRobertaTokenizer
@@ -108,17 +109,19 @@ class TPipeline:
 
     def _set_up_config(self, training_config):
         print('Setting up training config...')
+        legacy_gpu = training_config['gpu'] if 'gpu' in training_config else True
+        requested_device = training_config['device'] if 'device' in training_config else None
+        selected_device = resolve_device(requested_device, gpu=legacy_gpu)
         # set random seed
         os.environ['PYTHONHASHSEED'] = str(1234)
         random.seed(1234)
         np.random.seed(1234)
         torch.manual_seed(1234)
-        torch.cuda.manual_seed(1234)
-        torch.cuda.manual_seed_all(1234)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-        # empty cache
-        torch.cuda.empty_cache()
+        if selected_device.type == 'cuda':
+            torch.cuda.manual_seed(1234)
+            torch.cuda.manual_seed_all(1234)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
 
         # set embedding name
         self.master_config = MasterConfig()
@@ -163,15 +166,11 @@ class TPipeline:
         self._save_dir = training_config['save_dir'] if 'save_dir' in training_config else './cache/'
         self._save_dir = os.path.join(self._save_dir, self.master_config.embedding_name, self._lang)
         self._cache_dir = self._save_dir
-        self._gpu = training_config['gpu'] if 'gpu' in training_config else True
-        self._use_gpu = training_config['gpu'] if 'gpu' in training_config else True
+        self._gpu = legacy_gpu
+        # Legacy MWT/lemma code uses .cuda() directly; keep it CPU-bound on MPS.
+        self._use_gpu = selected_device.type == 'cuda'
         self._ud_eval = True
-        if self._gpu and torch.cuda.is_available():
-            self._use_gpu = True
-            self.master_config.device = torch.device('cuda')
-        else:
-            self._use_gpu = False
-            self.master_config.device = torch.device('cpu')
+        self.master_config.device = selected_device
 
         self.master_config._save_dir = self._save_dir
         self.master_config._cache_dir = self._save_dir

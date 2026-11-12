@@ -1,4 +1,5 @@
 from . import *
+from ..device import transformer_attention_mask_dtype
 
 # for sents
 instance_fields = [
@@ -208,7 +209,11 @@ class TaggerDatasetLive(Dataset):
             batch_feats_ids.append(inst.feats_type_idxs + [0] * (max_word_num - inst.word_num))
 
         batch_piece_idxs = torch.tensor(batch_piece_idxs, dtype=torch.long, device=self.config.device)
-        batch_attention_masks = torch.tensor(batch_attention_masks, dtype=torch.float16, device=self.config.device)
+        batch_attention_masks = torch.tensor(
+            batch_attention_masks,
+            dtype=transformer_attention_mask_dtype(self.config.device),
+            device=self.config.device,
+        )
         batch_edit_type_idxs = torch.tensor(batch_edit_type_idxs, dtype=torch.long, device=self.config.device)
         batch_word_span_idxs = torch.tensor(batch_word_span_idxs, dtype=torch.long, device=self.config.device)
 
@@ -401,7 +406,11 @@ class TaggerDataset(Dataset):
             batch_feats_ids.append(inst.feats_type_idxs + [0] * (max_word_num - inst.word_num))
 
         batch_piece_idxs = torch.tensor(batch_piece_idxs, dtype=torch.long, device=self.config.device)
-        batch_attention_masks = torch.tensor(batch_attention_masks, dtype=torch.float16, device=self.config.device)
+        batch_attention_masks = torch.tensor(
+            batch_attention_masks,
+            dtype=transformer_attention_mask_dtype(self.config.device),
+            device=self.config.device,
+        )
         batch_edit_type_idxs = torch.tensor(batch_edit_type_idxs, dtype=torch.long, device=self.config.device)
         batch_word_span_idxs = torch.tensor(batch_word_span_idxs, dtype=torch.long, device=self.config.device)
 
