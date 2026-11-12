@@ -43,3 +43,15 @@ def transformer_attention_mask_dtype(device, torch_module=None):
     torch_module = torch if torch_module is None else torch_module
     device_type = device.type if hasattr(device, 'type') else str(device).split(':', 1)[0].lower()
     return torch_module.float32 if device_type == 'mps' else torch_module.float16
+
+class DeviceSafeCrossEntropyLoss(torch.nn.CrossEntropyLoss):
+    """CrossEntropyLoss that is evaluated on CPU for MPS tensors.
+
+    torch 2.0.x's MPS cross_entropy/nll_loss kernels crash (SIGBUS/segfault) on current macOS.
+    The logits are small, and ``.cpu()`` is differentiable, so gradients still reach the MPS graph.
+    """
+
+    def forward(self, input, target):
+        if input.device.type == 'mps':
+            input, target = input.cpu(), target.cpu()
+        return super().forward(input, target)

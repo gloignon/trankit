@@ -96,3 +96,11 @@ Steps
 - [ ] Full run on the MacBook (data: ALSI `data/augmented` train+dev, test = `data/filtered/fr_gsd-ud-test.conllu`); pick epochs/batch from smoke timings.
 - [ ] Evaluate: (a) gold-tokenization UPOS/LEMMA/UAS/LAS (as ALSI `eval_trankit.py`), (b) sentence-boundary F1 on multi-sentence paragraphs, (c) against current XLM-R model + syntok.
 - [ ] Optional: reuse existing MWT/lemma models (encoder-independent) if retraining them is slow on CPU.
+
+### Phase 8 status notes (2026-11-12)
+- RULE: no training or smoke tests on the Mac mini (16 GB; MPS runs freeze it). All training/smoke runs happen on the MacBook (c64917.local).
+- MPS fixes found while smoke-testing (code committed, NOT yet verified end to end):
+  1. torch 2.0.1 MPS `cross_entropy` crashes (SIGBUS) -> `DeviceSafeCrossEntropyLoss` computes the loss on CPU (device.py).
+  2. `transformers.AdamW.step` on MPS clears `requires_grad` on all params after step 1 (batch 2 then fails) -> use `torch.optim.AdamW(eps=1e-6)` (tpipeline.py).
+  3. Observed ~14 s/iteration (batch 16) on the mini for the tokenizer task; MacBook speed unknown.
+- If MPS training stays unreliable on torch 2.0.1, try a newer torch in a separate runtime on the MacBook (the pin was already relaxed in setup.py).

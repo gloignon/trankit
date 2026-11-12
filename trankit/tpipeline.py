@@ -17,7 +17,7 @@ from .utils.tbinfo import tbname2training_id, lang2treebank
 from .utils.chuliu_edmonds import *
 from .device import resolve_device
 from tqdm import tqdm
-from transformers import AdamW, get_linear_schedule_with_warmup
+from transformers import get_linear_schedule_with_warmup
 from .encoder import set_embedding, load_tokenizer
 import logging
 
@@ -85,7 +85,10 @@ class TPipeline:
                     'lr': self._config.learning_rate, 'weight_decay': self._config.weight_decay
                 }
             ]
-            self.optimizer = AdamW(params=param_groups)
+            # torch.optim.AdamW instead of the deprecated transformers.AdamW: on MPS the latter's in-place
+            # updates clear requires_grad on every parameter after the first step. eps=1e-6 keeps
+            # transformers' default; bias correction and decoupled weight decay are equivalent.
+            self.optimizer = torch.optim.AdamW(params=param_groups, lr=1e-3, eps=1e-6)
 
             self.schedule = get_linear_schedule_with_warmup(self.optimizer,
                                                             num_warmup_steps=self.batch_num * 5,

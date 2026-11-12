@@ -1,6 +1,7 @@
 import torch.nn.functional as F
 from .base_models import *
 from trankit.layers.crf_layer import CRFLoss, viterbi_decode
+from ..device import DeviceSafeCrossEntropyLoss
 from ..utils.base_utils import *
 from ..utils.conll import *
 
@@ -84,7 +85,7 @@ class PosDepClassifier(nn.Module):
                                     self.down_dim, len(self.vocabs[DEPREL]))
 
         # loss function
-        self.criteria = torch.nn.CrossEntropyLoss()
+        self.criteria = DeviceSafeCrossEntropyLoss()
 
         if not config.training:
             # load pretrained weights
@@ -188,7 +189,7 @@ class TokenizerClassifier(nn.Module):
         self.tokenizer_ffn = nn.Linear(self.xlmr_dim, 5)
 
         # loss function
-        self.criteria = torch.nn.CrossEntropyLoss()
+        self.criteria = DeviceSafeCrossEntropyLoss()
 
         if not config.training:
             language = treebank2lang[treebank_name]
