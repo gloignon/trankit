@@ -40,12 +40,19 @@ def main():
     a = ap.parse_args()
     bs = dict(BATCH)
     bs.update({k: int(v) for k, v in (x.split("=") for x in a.batch_size)})
-    for f in (a.train_conllu, a.dev_conllu):
-        with open(f, "rb") as fh:
-            fh.seek(max(0, f.stat().st_size - 2))
-            if fh.read() != b"\n\n":
-                sys.exit(f"{f}: CoNLL-U must end with an empty line (Trankit's scorer fails after epoch 0 otherwise)")
     a.output.mkdir(parents=True, exist_ok=True)
+    # Trankit's per-epoch dev scoring fails ("does not end with empty line") unless a CoNLL-U ends with a blank
+    # line, which several pipeline steps strip. Use normalized copies so any dataset works.
+    def normalized(f):
+        data = Path(f).read_bytes()
+        if data.endswith(b"\n\n"):
+            return f
+        out = a.output / "_data" / Path(f).name
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(data.rstrip(b"\n") + b"\n\n")
+        print(f"normalized trailing blank line: {f} -> {out}", file=sys.stderr)
+        return out
+    a.train_conllu, a.dev_conllu = normalized(a.train_conllu), normalized(a.dev_conllu)
     for task in a.tasks:
         if task == "tokenize" and not (a.train_txt and a.dev_txt):
             sys.exit("tokenize needs --train-txt and --dev-txt (paragraph-structured; see prepare_tokenizer_data.py)")
