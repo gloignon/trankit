@@ -134,5 +134,5 @@ cache/trankit/
 
 # runtime artifacts
 /runtime/
-/model/
+/model
 /jobs/
