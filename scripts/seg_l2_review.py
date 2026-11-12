@@ -18,8 +18,9 @@ def starts(spans):
     return {s for s, _ in spans[1:]}
 
 
-def sheet(texts_json, out, base_files, extra_files):
+def sheet(texts_json, out, base_files, extra_files, trim_file=None):
     texts = json.load(open(texts_json))
+    trim = json.load(open(trim_file)) if trim_file else {}
     base = [json.load(open(f)) for f in base_files]
     extra = [json.load(open(f)) for f in extra_files]
     names = [f.rsplit("p_", 1)[-1].replace(".json", "") for f in base_files + extra_files]
@@ -28,9 +29,10 @@ def sheet(texts_json, out, base_files, extra_files):
         tx = t["text"]
         sets = [starts(p[t["id"]]) for p in base]
         xsets = [starts(p[t["id"]]) for p in extra]
-        cand = sorted(set().union(*sets, *xsets))
+        cut = trim.get(t["id"], 0)
+        cand = sorted(c for c in set().union(*sets, *xsets) if c > cut)  # header/title excluded
         # glued punctuation ("faces.Sur"): a typical L2 pattern that rule-based and neural splitters can all miss
-        glued = {m.end() for m in re.finditer(r"(?<=[a-zà-ÿ])[.!?](?=[A-ZÀ-Ý][a-zà-ÿ])", tx)}
+        glued = {m.end() for m in re.finditer(r"(?<=[a-zà-ÿ])[.!?](?=[A-ZÀ-Ý][a-zà-ÿ])", tx) if m.end() > cut}
         for c in sorted(glued - set(cand)):
             rows.append({"text_id": t["id"], "offset": c, "left": tx[max(0, c - 90):c], "right": tx[c:c + 90],
                          "proposed_by": "glued-punctuation-rule", "suggest": "y", "decision": ""})
@@ -69,9 +71,11 @@ def gold(texts_json, sheet_tsv, out, base_files):
 
 if __name__ == "__main__":
     a = sys.argv[1:]
+    trim_file = a[a.index("--trim") + 1] if "--trim" in a else None
+    a = [x for i, x in enumerate(a) if x != "--trim" and (i == 0 or a[i - 1] != "--trim")]
     extra = a[a.index("--extra") + 1:] if "--extra" in a else []
     pos = a[:a.index("--extra")] if "--extra" in a else a
     if pos[0] == "sheet":
-        sheet(pos[1], pos[2], pos[3:], extra)
+        sheet(pos[1], pos[2], pos[3:], extra, trim_file)
     else:
         gold(pos[1], pos[2], pos[3], pos[4:])
