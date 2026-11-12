@@ -132,3 +132,13 @@ French-GSD, raw text, CoNLL-18 F1. Different UD releases, so compare as order of
 | UDPipe 1 | 2.5 | 93.59 | 99.68 | Stanza paper / Trankit docs |
 | spaCy v2.3 (old) | 2.5 | 77.30 | 98.34 | Trankit docs |
 Not found: current spaCy `fr_core_news_*` senter F1 (see model card accuracy.json), SaT/wtpsplit French UD F1 (SaT paper arXiv 2406.16678 appendix). Both can be run directly on the ALSI test set.
+
+### Measured sentence-segmentation benchmark (2026-11-12)
+Data: ALSI `data/filtered/fr_gsd-ud-test.conllu`, 401 gold sentences in 67 raw paragraphs (seed 7, 1-12 sentences, mean 6.0). Metric: exact sentence-span P/R/F1 (`scripts/eval_sentence_segmentation.py`). CPU, no tuning.
+| System | Pred. sents | P | R | F1 | Paragraphs exactly right |
+|---|---|---|---|---|---|
+| Old ALSI Trankit (XLM-R), own splitting | 210 | 59.05 | 30.92 | **40.59** | 14.9% |
+| syntok | 381 | 92.65 | 88.03 | 90.28 | 70.1% |
+| Stanza 1.15 (fr, tokenize) | 404 | 95.30 | 96.01 | 95.65 | 85.1% |
+| SaT `sat-3l-sm` (wtpsplit) | 408 | 95.83 | 97.51 | 96.66 | 88.1% |
+| New CamemBERT Trankit | (pending training) | | | | |
