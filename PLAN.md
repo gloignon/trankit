@@ -116,3 +116,6 @@ Next: evaluate (gold-tok UPOS/LEMMA/UAS/LAS on `data/filtered` test; sentence-bo
 4. **MPS (torch 2.0.1, macOS 26):** `cross_entropy` crashes (SIGBUS), so the loss is computed on CPU for MPS tensors; `transformers.AdamW` clears `requires_grad` after step 1, so `torch.optim.AdamW` is used. Do not revert these.
 5. **A smoke test must run the whole loop, including dev scoring, for at least 2 epochs** (or at least 1 epoch plus the dev evaluation), and with data prepared the same way as the full run.
 6. Shell hook caveat on the Mac mini: top-level `rsync` calls with extra flags may be silently rewritten; use `bin/trankit-run-deploy`.
+
+### Evaluation protocol (decided 2026-11-12)
+ALSI's `eval_trankit.py --end-to-end` ("Sent 100" in the ALSI README) feeds one sentence per input and counts inputs with exactly 1 sentence returned, so it cannot detect under-splitting. For the new model, report CoNLL-18 `ud_eval` Sentences/Tokens/Words/UPOS/Lemma/UAS/LAS F1 on RAW multi-sentence paragraphs from `data/filtered/fr_gsd-ud-test.conllu`, for: new CamemBERT model (own splitting), old XLM-R model (own splitting), old model + syntok. Targets (README, same test set family): Sent 93.6 (UDPipe 1) .. 95.27 (UDPipe remix_3) .. 96.63 (Trankit base) .. 98.80 (Trankit large). Epoch 0 dev already gave Sentences F1 93.75 on 6.6-sentence paragraphs.
