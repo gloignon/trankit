@@ -31,26 +31,29 @@ Model location: `--model-dir` / `TRANKIT_MODEL_DIR`, default `$TRANKIT_HOME/mode
 - [x] Real encoders verified: `almanach/camembert-base` (768) and `camembert-large` (1024) load from the shared HF cache (`HF_HOME=/Volumes/Data/research_data/hf_cache`); CamemBERT routed through the XLM-R/RoBERTa class because `adapters` lacks a `camembert` module. A parser on them still needs training.
 - [ ] Equivalence check CPU vs MPS on the French model after the encoder change (phase 6).
 
-### 2. Service code into the package
+### 2. Service code into the package (DONE)
 - Port `trankit_backend.py`, `parse.py`, `api.py` into `trankit/service/` as importable modules (no `sys.path` hacks, no hardcoded ROOT).
 - Parameters: `model_dir`, `category` (default `customized-mwt`), `embedding` (default `xlm-roberta-base`, or any HF id/local dir), `device`.
 - API: accept `device` (cpu/mps/cuda) and `model_dir`/`embedding` startup flags; add a `{"op":"info"}` request (versions, device, model, encoder).
 - Keep output schema identical to `trankit_fr` (columns, `NA` handling, MWT expansion).
 - Gate: unit tests + output identical to `trankit_fr` on sample text (CPU).
 
-### 3. Runtime + shell entry points
+### 3. Runtime + shell entry points (DONE)
+Design: `runtime/` = third-party deps only (`requirements-runtime.txt`, pinned from the working trankit_fr runtime); `trankit/` is loaded from the checkout, so code sync to a remote is a cheap rsync and needs no reinstall. Model dir is external (`TRANKIT_MODEL_DIR`).
+Verified 2026-11-12: freshly built runtime; `bin/trankit-run` CoNLL-U output byte-identical to `trankit_fr` (syntok + lines, CPU); MPS == CPU on the sample.
 - `scripts/build_runtime.sh`: Python 3.10 venv, `pip install .[service]` (extras: syntok, optional spacy).
 - `bin/trankit-run`, `bin/trankit-run-api`, `bin/trankit-run-remote` ported from `trankit_fr` (env vars renamed `TRANKIT_REMOTE`, `TRANKIT_REMOTE_DIR`, `TRANKIT_MODEL_DIR`; old names still read).
 - Gate: batch CLI output (CoNLL-U + manifest) identical to `trankit_fr`.
 
-### 4. Remote
+### 4. Remote (code written; NOT yet tested: needs the remote host name)
 - Remote host chosen by the user (`--remote`, `TRANKIT_REMOTE`, or client `remote=`); default device on the remote = mps if available.
 - Batch mode: existing SSH/rsync flow (resume via manifest).
 - API mode: `ssh HOST $DIR/bin/trankit-run-api` gives a persistent remote JSONL stream for Python/R/agents.
 - Sync: code always; `runtime/` and `model/` only with `--remote-sync`. Never touch the remote `trankit_fr`.
 - Gate: run on the MacBook; results match local CPU.
 
-### 5. Clients (`/Volumes/Data/pipelines/clients`)
+### 5. Clients (`/Volumes/Data/pipelines/clients`) (written; local verified, remote pending)
+New files `trankit_client.py` / `trankit_client.R` (`trankit_run`, `trankit_annotate`, `TrankitClient`); `nlp_pipelines.*` and the legacy `trankit_fr()` are untouched until cutover (phase 6).
 - `nlp_pipelines.py/.R`: point to this repo (`TRANKIT_HOME`, default `/Volumes/Data/pipelines/trankit`), keep `trankit_fr(src, out_dir, split, device, overwrite)` signature, add `remote=`, `model_dir=`, `embedding=`.
 - New text-level calls: `trankit_annotate(texts, ...)` returning a DataFrame / data.frame, backed by one persistent API process (local or ssh), closed at end of job (pattern from `embedder.py`/`embedder.R`).
 - Agent use: the CLI is self-documenting (`--help`, `info`, JSON output). MCP server only if requested.
